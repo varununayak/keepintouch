@@ -1,10 +1,10 @@
-# Keep in Touch
+# Circles
 
 A cross-platform mobile application that helps you maintain meaningful relationships by tracking and reminding you to stay in touch with your network.
 
 ## 🎯 Project Goals
 
-Keep in Touch is designed to help users maintain their social connections by:
+Circles is designed to help users maintain their social connections by:
 - Tracking relationships with different tiers of closeness
 - Providing timely reminders for reaching out
 - Integrating with Google Calendar for seamless scheduling
