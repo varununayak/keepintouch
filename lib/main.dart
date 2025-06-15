@@ -1,6 +1,15 @@
 import 'package:flutter/material.dart';
+import 'models/friend.dart';
 
 void main() {
+  final friend = Friend(
+    id: '1',
+    name: 'Alice',
+    closenessTier: ClosenessTier.close,
+    notes: 'Met at the conference',
+    lastContacted: DateTime.now().subtract(Duration(days: 3)),
+  );
+  print('Sample friend: \\${friend.name}, Tier: \\${friend.closenessTier}, Last contacted: \\${friend.lastContacted}');
   runApp(const MyApp());
 }
 
