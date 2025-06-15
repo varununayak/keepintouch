@@ -9,6 +9,7 @@ Circles is designed to help users maintain their social connections by:
 - Providing timely reminders for reaching out
 - Integrating with Google Calendar for seamless scheduling
 - Offering a simple, intuitive interface for managing contacts
+- **Seamless, single-screen experience:** Dashboard highlights and friends list are visible together, minimizing navigation and making the app feel unified.
 
 ## ✅ Core Features
 
@@ -74,6 +75,7 @@ lib/
 - [ ] Friend list and management screens
 - [ ] Local database implementation
 - [ ] Closeness tier system
+- [ ] **Combine dashboard highlights and friends list into a single, seamless screen**
 
 ### Week 2: Reminder System
 - [ ] Reminder scheduling logic
