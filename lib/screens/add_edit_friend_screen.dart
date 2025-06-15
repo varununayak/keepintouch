@@ -34,6 +34,35 @@ class _AddEditFriendScreenState extends State<AddEditFriendScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.friend == null ? 'Add Friend' : 'Edit Friend'),
+        actions: [
+          if (widget.friend != null)
+            IconButton(
+              icon: const Icon(Icons.delete),
+              tooltip: 'Delete',
+              onPressed: () async {
+                final confirm = await showDialog<bool>(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('Delete Friend'),
+                    content: const Text('Are you sure you want to delete this friend?'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(false),
+                        child: const Text('Cancel'),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(true),
+                        child: const Text('Delete'),
+                      ),
+                    ],
+                  ),
+                );
+                if (confirm == true) {
+                  Navigator.of(context).pop({'delete': true, 'id': widget.friend!.id});
+                }
+              },
+            ),
+        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),

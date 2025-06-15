@@ -94,8 +94,24 @@ class _FriendsListScreenState extends State<FriendsListScreen> {
                         : 'Never',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
-                  onTap: () {
-                    // TODO: Navigate to friend details
+                  onTap: () async {
+                    final result = await Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => AddEditFriendScreen(friend: friend),
+                      ),
+                    );
+                    if (result is Friend) {
+                      setState(() {
+                        final idx = _friends.indexWhere((f) => f.id == result.id);
+                        if (idx != -1) {
+                          _friends[idx] = result;
+                        }
+                      });
+                    } else if (result is Map && result['delete'] == true && result['id'] != null) {
+                      setState(() {
+                        _friends.removeWhere((f) => f.id == result['id']);
+                      });
+                    }
                   },
                 );
               },
