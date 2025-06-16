@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'models/friend.dart';
 import 'screens/add_edit_friend_screen.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 void main() {
   runApp(const MyApp());
@@ -40,7 +41,6 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  // Temporary list for development - will be replaced with proper state management
   final List<Friend> _friends = [
     Friend(
       id: '1',
@@ -64,6 +64,38 @@ class _HomeScreenState extends State<HomeScreen> {
       lastContacted: DateTime.now().subtract(const Duration(days: 45)),
     ),
   ];
+
+  final GoogleSignIn _googleSignIn = GoogleSignIn(
+    scopes: [
+      'email',
+      'https://www.googleapis.com/auth/calendar',
+      'https://www.googleapis.com/auth/calendar.events',
+    ],
+  );
+  GoogleSignInAccount? _currentUser;
+
+  @override
+  void initState() {
+    super.initState();
+    _googleSignIn.onCurrentUserChanged.listen((GoogleSignInAccount? account) {
+      setState(() {
+        _currentUser = account;
+      });
+    });
+    _googleSignIn.signInSilently();
+  }
+
+  Future<void> _handleSignIn() async {
+    try {
+      await _googleSignIn.signIn();
+    } catch (error) {
+      // Optionally show error
+    }
+  }
+
+  Future<void> _handleSignOut() async {
+    await _googleSignIn.disconnect();
+  }
 
   List<Friend> _getSuggestedContacts() {
     final now = DateTime.now();
@@ -182,6 +214,24 @@ class _HomeScreenState extends State<HomeScreen> {
             onPressed: () {
               // TODO: Implement settings
             },
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8.0),
+            child: GestureDetector(
+              onTap: () async {
+                if (_currentUser == null) {
+                  await _handleSignIn();
+                } else {
+                  await _handleSignOut();
+                }
+              },
+              child: _currentUser == null
+                  ? const Icon(Icons.person_outline, color: Colors.grey)
+                  : CircleAvatar(
+                      backgroundImage: NetworkImage(_currentUser!.photoUrl ?? ''),
+                      backgroundColor: Colors.transparent,
+                    ),
+            ),
           ),
         ],
       ),
