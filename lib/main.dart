@@ -20,10 +20,57 @@ class MyApp extends StatelessWidget {
       title: 'Circles',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.blue,
+          seedColor: const Color(0xFF009688), // Teal
           brightness: Brightness.light,
+          primary: const Color(0xFF009688),
+          secondary: const Color(0xFFFF9800), // Orange accent
+          background: const Color(0xFFF5F5F5),
+          surface: Colors.white,
+          error: const Color(0xFFD32F2F),
+          onPrimary: Colors.white,
+          onBackground: Colors.black87,
         ),
         useMaterial3: true,
+        fontFamily: 'Roboto',
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Color(0xFF009688),
+          foregroundColor: Colors.white,
+          elevation: 0,
+          centerTitle: false,
+          titleTextStyle: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 22,
+            color: Colors.white,
+          ),
+        ),
+        floatingActionButtonTheme: const FloatingActionButtonThemeData(
+          backgroundColor: Color(0xFF009688),
+          foregroundColor: Colors.white,
+          elevation: 4,
+        ),
+        cardTheme: CardThemeData(
+          color: Colors.white,
+          elevation: 2,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 0),
+        ),
+        snackBarTheme: const SnackBarThemeData(
+          backgroundColor: Color(0xFF009688),
+          contentTextStyle: TextStyle(color: Colors.white),
+          actionTextColor: Colors.white,
+        ),
+        inputDecorationTheme: InputDecorationTheme(
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+        listTileTheme: const ListTileThemeData(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.all(Radius.circular(12)),
+          ),
+        ),
       ),
       darkTheme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
