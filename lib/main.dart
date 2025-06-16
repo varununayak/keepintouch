@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'models/friend.dart';
 import 'screens/add_edit_friend_screen.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'services/calendar_service.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:intl/intl.dart';
+import 'package:googleapis/calendar/v3.dart' as calendar;
 
 void main() {
   runApp(const MyApp());
@@ -73,6 +77,8 @@ class _HomeScreenState extends State<HomeScreen> {
     ],
   );
   GoogleSignInAccount? _currentUser;
+  List<calendar.Event> _upcomingCirclesEvents = [];
+  bool _loadingEvents = false;
 
   @override
   void initState() {
@@ -81,6 +87,14 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() {
         _currentUser = account;
       });
+      if (account != null) {
+        _fetchUpcomingCirclesEvents();
+        syncFriendsWithCalendar();
+      } else {
+        setState(() {
+          _upcomingCirclesEvents = [];
+        });
+      }
     });
     _googleSignIn.signInSilently();
   }
@@ -179,6 +193,7 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() {
         _friends.add(newFriend);
       });
+      await _maybeCreateCalendarEvent(newFriend);
     }
   }
 
@@ -189,17 +204,92 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
     if (result is Friend) {
+      final oldTier = friend.closenessTier;
       setState(() {
         final idx = _friends.indexWhere((f) => f.id == result.id);
         if (idx != -1) {
           _friends[idx] = result;
         }
       });
+      if (oldTier != result.closenessTier) {
+        await _maybeCreateCalendarEvent(result);
+      }
     } else if (result is Map && result['delete'] == true && result['id'] != null) {
       setState(() {
         _friends.removeWhere((f) => f.id == result['id']);
       });
     }
+  }
+
+  /// Temporary sync: For each friend, if no Circles event exists, create one.
+  /// In the future, this can use a database instead of the in-memory list.
+  Future<void> syncFriendsWithCalendar() async {
+    if (_currentUser == null) return;
+    final calendarService = CalendarService(_currentUser!);
+    // Fetch all upcoming Circles events (for all friends)
+    final events = await calendarService.fetchUpcomingCirclesEvents(maxResults: 100);
+    for (final friend in _friends) {
+      final hasEvent = events.any((event) =>
+        event.summary == 'Check in with ${friend.name}'
+      );
+      if (!hasEvent) {
+        await calendarService.createRecurringCheckInEvent(
+          friend: friend,
+          start: _getFirstEventDate(friend.closenessTier),
+        );
+      }
+    }
+    await _fetchUpcomingCirclesEvents();
+  }
+
+  Future<void> _maybeCreateCalendarEvent(Friend friend) async {
+    if (_currentUser == null) return;
+    final calendarService = CalendarService(_currentUser!);
+    final DateTime start = _getFirstEventDate(friend.closenessTier);
+    final link = await calendarService.createRecurringCheckInEvent(friend: friend, start: start);
+    if (link != null && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Recurring check-in event created for ${friend.name}'),
+          action: SnackBarAction(
+            label: 'View/Edit',
+            onPressed: () async {
+              final uri = Uri.parse(link);
+              if (await canLaunchUrl(uri)) {
+                await launchUrl(uri, mode: LaunchMode.externalApplication);
+              }
+            },
+          ),
+        ),
+      );
+    }
+    // Always refresh highlights after event creation
+    await _fetchUpcomingCirclesEvents();
+  }
+
+  DateTime _getFirstEventDate(ClosenessTier tier) {
+    final now = DateTime.now();
+    switch (tier) {
+      case ClosenessTier.close:
+        return now.add(const Duration(days: 7));
+      case ClosenessTier.medium:
+        return now.add(const Duration(days: 30));
+      case ClosenessTier.distant:
+        return now.add(const Duration(days: 60));
+    }
+  }
+
+  Future<void> _fetchUpcomingCirclesEvents() async {
+    if (_currentUser == null) return;
+    setState(() {
+      _loadingEvents = true;
+    });
+    final calendarService = CalendarService(_currentUser!);
+    final events = await calendarService.fetchUpcomingCirclesEvents(maxResults: 3);
+    setState(() {
+      _upcomingCirclesEvents = events;
+      _loadingEvents = false;
+    });
   }
 
   @override
@@ -246,6 +336,52 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 Text('Highlights', style: Theme.of(context).textTheme.titleLarge),
                 const SizedBox(height: 8),
+                if (_currentUser != null)
+                  _loadingEvents
+                      ? const Center(child: CircularProgressIndicator())
+                      : _upcomingCirclesEvents.isEmpty
+                          ? Row(
+                              children: [
+                                const Icon(Icons.check_circle_outline, color: Colors.green, size: 28),
+                                const SizedBox(width: 8),
+                                Text('No upcoming Circles events!', style: Theme.of(context).textTheme.bodyLarge),
+                              ],
+                            )
+                          : Column(
+                              children: _upcomingCirclesEvents.map((event) {
+                                final start = event.start?.dateTime ?? event.start?.date;
+                                final dateStr = start != null ? DateFormat('EEE, MMM d').format(start.toLocal()) : '';
+                                final timeStr = start != null && event.start?.dateTime != null ? DateFormat('h:mm a').format(start.toLocal()) : '';
+                                return Card(
+                                  margin: const EdgeInsets.symmetric(vertical: 4),
+                                  child: ListTile(
+                                    leading: const Icon(Icons.event, color: Color(0xFF1976D2)),
+                                    title: Text(event.summary ?? 'Circles Event'),
+                                    subtitle: Text('$dateStr${timeStr.isNotEmpty ? ' • $timeStr' : ''}'),
+                                    trailing: IconButton(
+                                      icon: const Icon(Icons.open_in_new),
+                                      onPressed: event.htmlLink != null
+                                          ? () async {
+                                              final uri = Uri.parse(event.htmlLink!);
+                                              if (await canLaunchUrl(uri)) {
+                                                await launchUrl(uri, mode: LaunchMode.externalApplication);
+                                              }
+                                            }
+                                          : null,
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                if (_currentUser == null)
+                  Row(
+                    children: [
+                      const Icon(Icons.info_outline, color: Colors.grey, size: 28),
+                      const SizedBox(width: 8),
+                      Text('Sign in to see your Circles events', style: Theme.of(context).textTheme.bodyLarge),
+                    ],
+                  ),
+                const SizedBox(height: 16),
                 if (suggestedContacts.isEmpty)
                   Row(
                     children: [
