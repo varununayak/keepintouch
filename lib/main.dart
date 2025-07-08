@@ -3,13 +3,19 @@ import 'models/friend.dart';
 import 'screens/add_edit_friend_screen.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'services/calendar_service.dart';
+import 'services/data_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:intl/intl.dart';
 import 'package:googleapis/calendar/v3.dart' as calendar;
 import 'dart:io' show Platform;
 import 'package:android_intent_plus/android_intent.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize Hive for data persistence
+  await DataService.initialize();
+  
   runApp(const MyApp());
 }
 
@@ -178,29 +184,7 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
-  final List<Friend> _friends = [
-    Friend(
-      id: '1',
-      name: 'John Doe',
-      closenessTier: ClosenessTier.close,
-      notes: 'College roommate',
-      lastContacted: DateTime.now().subtract(const Duration(days: 2)),
-    ),
-    Friend(
-      id: '2',
-      name: 'Jane Smith',
-      closenessTier: ClosenessTier.medium,
-      notes: 'Work colleague',
-      lastContacted: DateTime.now().subtract(const Duration(days: 15)),
-    ),
-    Friend(
-      id: '3',
-      name: 'Mike Johnson',
-      closenessTier: ClosenessTier.distant,
-      notes: 'High school friend',
-      lastContacted: DateTime.now().subtract(const Duration(days: 45)),
-    ),
-  ];
+  List<Friend> _friends = [];
 
   final GoogleSignIn _googleSignIn = GoogleSignIn(
     scopes: [
@@ -216,6 +200,7 @@ class _MainScreenState extends State<MainScreen> {
   @override
   void initState() {
     super.initState();
+    _loadFriends();
     _googleSignIn.onCurrentUserChanged.listen((GoogleSignInAccount? account) {
       setState(() {
         _currentUser = account;
@@ -230,6 +215,12 @@ class _MainScreenState extends State<MainScreen> {
       }
     });
     _googleSignIn.signInSilently();
+  }
+
+  void _loadFriends() {
+    setState(() {
+      _friends = DataService.getAllFriends();
+    });
   }
 
   Future<void> _fetchUpcomingCirclesEvents() async {
@@ -874,6 +865,20 @@ class _MainScreenState extends State<MainScreen> {
             ),
           ),
           const SizedBox(height: 16),
+          // Debug section
+          Card(
+            child: Column(
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.bug_report),
+                  title: const Text('Debug Info'),
+                  subtitle: Text('${_friends.length} friends stored'),
+                  onTap: () => _showDebugInfo(),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
           if (_currentUser != null)
             Card(
               child: ListTile(
@@ -980,6 +985,7 @@ class _MainScreenState extends State<MainScreen> {
       ),
     );
     if (newFriend != null) {
+      await DataService.addFriend(newFriend);
       setState(() {
         _friends.add(newFriend);
       });
@@ -995,6 +1001,7 @@ class _MainScreenState extends State<MainScreen> {
     );
     if (result is Friend) {
       final oldTier = friend.closenessTier;
+      await DataService.updateFriend(result);
       setState(() {
         final idx = _friends.indexWhere((f) => f.id == result.id);
         if (idx != -1) {
@@ -1005,6 +1012,7 @@ class _MainScreenState extends State<MainScreen> {
         await _maybeCreateCalendarEvent(result);
       }
     } else if (result is Map && result['delete'] == true && result['id'] != null) {
+      await DataService.deleteFriend(result['id']);
       setState(() {
         _friends.removeWhere((f) => f.id == result['id']);
       });
@@ -1021,6 +1029,54 @@ class _MainScreenState extends State<MainScreen> {
 
   Future<void> _handleSignOut() async {
     await _googleSignIn.disconnect();
+  }
+
+  void _showDebugInfo() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Database Debug Info'),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Total Friends: ${_friends.length}'),
+              const SizedBox(height: 16),
+              if (_friends.isNotEmpty) ...[
+                const Text('Friends in Database:', style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                ..._friends.map((friend) => Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('• ${friend.name} (${friend.closenessTier.name})'),
+                      if (friend.notes != null) Text('  Notes: ${friend.notes}'),
+                      if (friend.lastContacted != null) 
+                        Text('  Last Contact: ${DateFormat('MMM d, y').format(friend.lastContacted!)}'),
+                    ],
+                  ),
+                )),
+              ] else
+                const Text('No friends in database'),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    DataService.close();
+    super.dispose();
   }
 
   Future<void> _openGoogleCalendar() async {
